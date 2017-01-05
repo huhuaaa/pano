@@ -67,6 +67,10 @@ class UnitSphere:
         self.PixelBuffer = None
         self.ImageW = 0
         self.ImageH = 0
+        self.pi2 = 2 * math.pi
+        self.pihalf = 0.5 * math.pi
+        self.R = 0
+        self.Hr = 0
         if texPath is not None:
             self.LoadTexture(texPath)
         return
@@ -87,6 +91,10 @@ class UnitSphere:
         self.PixelBuffer = texImg.load()
         self.ImageW = texImg.size[0]
         self.ImageH = texImg.size[1]
+        # 半径
+        self.R = self.ImageW / self.pi2
+        # 高的半径，默认为二比一的话，那么就是半径的一半
+        self.Hr = self.ImageH / math.pi
 
         print('Use time ' + str(time.time() - currentTime) + 'sec')
 
@@ -95,8 +103,8 @@ class UnitSphere:
     def GetColor(self, hRad, vRad):
         if self.PixelBuffer is None: return 0, 0, 0
 
-        x = hRad * self.ImageW / (math.pi * 2.0)
-        y = (vRad + math.pi * 0.5) * self.ImageH / math.pi
+        x = hRad * self.R
+        y = (vRad + self.pihalf) * self.Hr
         y = self.ImageH - y
 
         px = int(math.floor(x))
@@ -130,7 +138,7 @@ def RayCastCubeFace(sphere, origin, wVec, hVec, pxWidth, pxHeight, sampleRate):
     # input face rect, sampling rate
     # for each pixel, cast ray, and merge samples
     # save the face
-    samples = sampleRate * sampleRate
+    samples = float(sampleRate * sampleRate)
 
     wFace = wVec.length()
     hFace = hVec.length()
@@ -157,10 +165,10 @@ def RayCastCubeFace(sphere, origin, wVec, hVec, pxWidth, pxHeight, sampleRate):
 
             c = [0, 0, 0]
             for j in range(sampleRate):
-                dySubPixel = hDir.mul((float(j) + 0.5) * hSubPixel)
+                dySubPixel = hDir.mul((j + 0.5) * hSubPixel)
                 baseSubPos = pos.add(dySubPixel)
                 for i in range(sampleRate):
-                    dxSubPixel = wDir.mul((float(i) + 0.5) * wSubPixel)
+                    dxSubPixel = wDir.mul((i + 0.5) * wSubPixel)
                     subPos = baseSubPos.add(dxSubPixel)
 
                     hRad, vRad = XYZToHVRad(subPos.x, subPos.y, subPos.z)
@@ -171,9 +179,9 @@ def RayCastCubeFace(sphere, origin, wVec, hVec, pxWidth, pxHeight, sampleRate):
                     pass
             # end iterating subpixel
 
-            r = round(c[0] / float(samples))
-            g = round(c[1] / float(samples))
-            b = round(c[2] / float(samples))
+            r = round(c[0] / samples)
+            g = round(c[1] / samples)
+            b = round(c[2] / samples)
             colors.append((int(r), int(g), int(b)))
             pass
         pass
@@ -184,7 +192,7 @@ def RayCastCubeFace(sphere, origin, wVec, hVec, pxWidth, pxHeight, sampleRate):
 def SaveCubeFace(path, w, h, colors):
     img = Image.new('RGB', (w, h))
     img.putdata(colors)
-    img.save(path)
+    img.save(path, quality=85)
     return
 
 class RectDesc:
@@ -239,13 +247,9 @@ def GetCubeBottomRect():
     desc.vside.set(2.0, 0.0, 0.0)
     return desc
 
-global sphere
-
 # 多线程
 def createCubeFront(origin, file, width, height, sample):
     global sphere
-    sphere = UnitSphere()
-    sphere.LoadTexture(origin)
     print('generating front face')
     face = GetCubeFrontRect()
     colors = RayCastCubeFace(sphere, face.origin, face.hside, face.vside, width, height, sample)
@@ -255,8 +259,7 @@ def createCubeFront(origin, file, width, height, sample):
     return
 
 def createCubeLeft(origin, file, width, height, sample):
-    sphere = UnitSphere()
-    sphere.LoadTexture(origin)
+    global sphere
     print('generating right face')
     face = GetCubeLeftRect()
     colors = RayCastCubeFace(sphere, face.origin, face.hside, face.vside, width, height, sample)
@@ -266,8 +269,7 @@ def createCubeLeft(origin, file, width, height, sample):
     return
 
 def createCubeRight(origin, file, width, height, sample):
-    sphere = UnitSphere()
-    sphere.LoadTexture(origin)
+    global sphere
     print('generating left face')
     face = GetCubeRightRect()
     colors = RayCastCubeFace(sphere, face.origin, face.hside, face.vside, width, height, sample)
@@ -277,8 +279,7 @@ def createCubeRight(origin, file, width, height, sample):
     return
 
 def createCubeBack(origin, file, width, height, sample):
-    sphere = UnitSphere()
-    sphere.LoadTexture(origin)
+    global sphere
     print('generating back face')
     face = GetCubeBackRect()
     colors = RayCastCubeFace(sphere, face.origin, face.hside, face.vside, width, height, sample)
@@ -288,8 +289,7 @@ def createCubeBack(origin, file, width, height, sample):
     return
 
 def createCubeTop(origin, file, width, height, sample):
-    sphere = UnitSphere()
-    sphere.LoadTexture(origin)
+    global sphere
     print('generating top face')
     face = GetCubeTopRect()
     colors = RayCastCubeFace(sphere, face.origin, face.hside, face.vside, width, height, sample)
@@ -299,8 +299,7 @@ def createCubeTop(origin, file, width, height, sample):
     return
 
 def createCubeBottom(origin, file, width, height, sample):
-    sphere = UnitSphere()
-    sphere.LoadTexture(origin)
+    global sphere
     print('generating bottom face')
     face = GetCubeBottomRect()
     colors = RayCastCubeFace(sphere, face.origin, face.hside, face.vside, width, height, sample)
@@ -326,13 +325,25 @@ def run_process(file, w, h, s, num):
     pool.join()
     return 
 
-# if __name__ == '__main':
+# if __name__ == '__main__':
+#     sphere = UnitSphere()
+#     sphere.LoadTexture('pano1.jpg')
 #     createCubeFront('pano1.jpg', 'f.jpg', 1500, 1500, 1)
 
+sphere = UnitSphere()
+sphere.LoadTexture('pano1.jpg')
+
 if __name__ == '__main__':
+    print('go main')
+    multiprocessing.freeze_support()
+    print('main')
     # 主进程不处理数据
     currentTime = time.time()
     cpu_count = multiprocessing.cpu_count()
     print("The number of CPU is: " + str(cpu_count))
-    run_process('pano1.jpg', 1500, 1500, 1, cpu_count - 1)
+    process_num = cpu_count - 1 if cpu_count > 1 else 1
+    print("The number of process is: " + str(process_num))
+    run_process('pano1.jpg', 1592, 1592, 1, process_num)
     print('Use time ' + str(time.time() - currentTime) + 'sec')
+# else:
+#     sphere.LoadTexture('pano1.jpg')

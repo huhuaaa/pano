@@ -5,7 +5,6 @@ cdef extern from "math.h":
     float sqrt(float value)
     float floor(float value)
 
-import os, math
 from PIL import Image
 
 # 向量相加
@@ -37,11 +36,13 @@ def XYZToHVRad(x, y, z):
     t = sqrt(x*x + y*y)
 
     hRad = 0.0
-    if t > 0.000001: # t == 0.0
+    # if t > 0.000001: # t == 0.0
+    if t > 0.0:
         cosh = x / t
         hRad = acosf(cosh)
         if y < 0.0:
-            hRad = 2.0 * math.pi - hRad
+            # hRad = 2.0 * math.pi - hRad
+            hRad = 6.28318530717958 - hRad
 
     d = sqrt(t*t + z*z)
     sint = z / d
@@ -49,46 +50,68 @@ def XYZToHVRad(x, y, z):
 
     return hRad, vRad
 
-def getPoints(origin, wVec, hVec, width, height, sampleRate):
-    wFace = length(wVec)
-    hFace = length(hVec)
-    wPixel = wFace / float(width)
-    hPixel = hFace / float(height)
-    samples = float(sampleRate * sampleRate)
-    wSubPixel = wPixel / sampleRate
-    hSubPixel = hPixel / sampleRate
+def getPoints(width, height):
+    # wFace = length(wVec)
+    # hFace = length(hVec)
+    # wPixel = wFace / float(width)
+    # hPixel = hFace / float(height)
+    # samples = float(sampleRate * sampleRate)
+    # wSubPixel = wPixel / sampleRate
+    # hSubPixel = hPixel / sampleRate
+    
+    wPixel = 2.0 / float(width)
+    hPixel = 2.0 / float(height)
+    wSubPixel = wPixel
+    hSubPixel = hPixel
 
-    wDir = norm(wVec)
-    hDir = norm(hVec)
+    # wDir = norm(wVec)
+    # hDir = norm(hVec)
+    # dySubPixel = mul(hDir, 0.5 * hSubPixel)
+    # dxSubPixel = mul(wDir, 0.5 * wSubPixel)
+    frontOrigin = [-1.0, 1.0, 1.0]
+    frontWVec = [0.0, -2.0, 0.0]
+    frontHVec = [0.0, 0.0, -2.0]
+    frontWDir = norm(frontWVec)
+    frontHDir = norm(frontHVec)
+    frontDySubPixel = mul(frontHDir, 0.5 * hSubPixel)
+    frontDxSubPixel = mul(frontWDir, 0.5 * wSubPixel)
+    frontPoints = []
 
-    pyRange = range(height)
-    pxRange = range(width)
+    # leftOrigin = [1.0, 1.0, 1.0]
+    # leftWVec = [-2.0, 0.0, 0.0]
+    # leftHVec = [0.0, 0.0, -2.0]
+    # leftWDir = norm(leftWVec)
+    # leftHDir = norm(leftHVec)
+    # leftDySubPixel = mul(leftHDir, 0.5 * hSubPixel)
+    # leftDxSubPixel = mul(leftWDir, 0.5 * wSubPixel)
+    # leftPoints = []
 
-    # dy = [0.0, 0.0, 0.0]
-    # dx = [0.0, 0.0, 0.0]
-    # basePos = [0.0, 0.0, 0.0]
-    # subPos = [0.0, 0.0, 0.0]
-    dySubPixel = mul(hDir, 0.5 * hSubPixel)
-    dxSubPixel = mul(wDir, 0.5 * wSubPixel)
-    points = []
-    for py in pyRange:
-        dy = mul(hDir, py * hPixel)
-        basePos = add(origin, dy)
-        for px in pxRange:
-            dx = mul(wDir, px * wPixel)
-            pos = add(basePos, dx)
-            baseSubPos = add(pos, dySubPixel)
-            subPos = add(baseSubPos, dxSubPixel)
-            hRad, vRad = XYZToHVRad(subPos[0], subPos[1], subPos[2])
-            points.append([hRad, vRad])
+    for py in range(height):
+        frontBasePos = add(frontOrigin, mul(frontHDir, py * hPixel))
 
-    return points
+        # leftBasePos = add(leftOrigin, mul(leftHDir, py * hPixel))
+        for px in range(width):
+            frontDx = mul(frontWDir, px * wPixel)
+            frontPos = add(frontBasePos, frontDx)
+            frontBaseSubPos = add(frontPos, frontDySubPixel)
+            frontSubPos = add(frontBaseSubPos, frontDxSubPixel)
+            hRad, vRad = XYZToHVRad(frontSubPos[0], frontSubPos[1], frontSubPos[2])
+            frontPoints.append([hRad, vRad])
 
-def frontPoints(width, height, sampleRate):
-    origin = [-1.0, 1.0, 1.0]
-    wVec = [0.0, -2.0, 0.0]
-    hVec = [0.0, 0.0, -2.0]
-    return getPoints(origin, wVec, hVec, width, height, sampleRate)
+            # leftDx = mul(leftWDir, px * wPixel)
+            # leftPos = add(leftBasePos, leftDx)
+            # leftBaseSubPos = add(leftPos, leftDySubPixel)
+            # leftSubPos = add(leftBaseSubPos, leftDxSubPixel)
+            # hRad, vRad = XYZToHVRad(leftSubPos[0], leftSubPos[1], leftSubPos[2])
+            # leftPoints.append([hRad, vRad])
+
+    return frontPoints
+
+# def frontPoints(width, height):
+#     origin = [-1.0, 1.0, 1.0]
+#     wVec = [0.0, -2.0, 0.0]
+#     hVec = [0.0, 0.0, -2.0]
+#     return getPoints(origin, wVec, hVec, width, height)
 
 class sphereToCube:
 
@@ -96,11 +119,11 @@ class sphereToCube:
         self.image = Image.open(imgPath)
         self.width = self.image.size[0]
         self.height = self.image.size[1]
-        self.twoPi = 2.0 * math.pi
-        self.widthRadius = self.width / self.twoPi
-        self.heightRadius = self.height / math.pi
+        # self.widthRadius = self.width / 2.8 * math.pi
+        self.widthRadius = self.width / 6.28318530717958
+        self.heightRadius = self.height / 3.14159265358979
         self.heightHalf = self.height * 0.5
-        self.cubeWidth = (int(self.width / math.pi) >> 1) << 1
+        self.cubeWidth = int(self.width / 3.14159265358979)
         self.cubeHeight = self.cubeWidth
         self.pixelBuffer = self.image.load()
         print('cubeWidth: %d' % self.cubeWidth)
@@ -123,7 +146,7 @@ class sphereToCube:
 
     def toCube(self, savePath):
         front = savePath.replace('%s', 'f')
-        points = frontPoints(self.cubeWidth, self.cubeHeight, 1)
+        points = getPoints(self.cubeWidth, self.cubeHeight)
         colors = []
         for point in points:
             colors.append(self.getColor(point[0], point[1]))
