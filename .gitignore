@@ -3,3 +3,7 @@ Cpano.o
 Cpano/Cpano.so
 Cpano/Cpano.o
 Cpano/Cpano.c
+/build
+/dist
+/test
+/Cpano/build
