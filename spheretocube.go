@@ -7,6 +7,7 @@ import (
 	"image/jpeg"
     "math"
     "time"
+    "interp"
 )
 
 /**
@@ -93,7 +94,7 @@ func XYZToHVRad(x float64, y float64, z float64) (hRad float64, vRad float64){
  * @param  {[type]} height      int)          (result       [][2]int [description]
  * @return {[type]}             [description]
  */
-func calculatePosition(origin [3]float64, wVec [3]float64, hVec [3]float64, imageWidth int, imageHeight int, width int, height int) (result [][2]int){
+func calculatePosition(origin [3]float64, wVec [3]float64, hVec [3]float64, imageWidth int, imageHeight int, width int, height int) (result [][2]float64){
     wFace := length(wVec)
     hFace := length(hVec)
     wPixel := wFace / float64(width)
@@ -114,7 +115,7 @@ func calculatePosition(origin [3]float64, wVec [3]float64, hVec [3]float64, imag
     var dxSubPixel [3]float64
     var subPos [3]float64
 
-    result = [][2]int{}
+    result = [][2]float64{}
 
     for py := 0; py < height; py++ {
         dy = mul(hDir, float64(py) * hPixel)
@@ -135,7 +136,7 @@ func calculatePosition(origin [3]float64, wVec [3]float64, hVec [3]float64, imag
             y := (vRad + math.Pi * 0.5) * float64(imageHeight) / math.Pi
             y = float64(imageHeight) - y
 
-            result = append(result, [2]int{int(math.Floor(x)), int(math.Floor(y))})
+            result = append(result, [2]float64{x, y})
         }
     }
 
@@ -151,12 +152,13 @@ func calculatePosition(origin [3]float64, wVec [3]float64, hVec [3]float64, imag
  * @param  {[type]} path      string        生成图片保存位置
  * @return error
  */
-func positionToImage(img image.Image, positions [][2]int, width int, height int, path string) (err error) {
+func positionToImage(img image.Image, positions [][2]float64, width int, height int, path string) (err error) {
     rgba := image.NewRGBA(image.Rect(0, 0, width, height))
     for i := 0; i < len(positions); i++ {
         h := int(math.Floor(float64(i) / float64(width)))
         w := i - h * width
-        color := img.At(positions[i][0], positions[i][1])
+        color := interp.BilinearGeneral(img, positions[i][0], positions[i][1]);
+        // color := img.At(positions[i][0], positions[i][1])
         rgba.Set(w, h, color)
     }
     newFile, _ := os.Create(path)
